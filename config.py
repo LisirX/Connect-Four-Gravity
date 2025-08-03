@@ -20,5 +20,5 @@ TRAINING_DATA_PATH = "data/training_data.pkl"
 
 # --- 训练 (Training) 配置 ---
 EPOCHS = 10
-BATCH_SIZE = 32 
+BATCH_SIZE = 64 
 LEARNING_RATE = 0.001
