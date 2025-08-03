@@ -41,7 +41,7 @@ class MCTS:
         move_visits = np.array([self.root.children.get(a, Node()).n_visits for a in range(num_cols)])
         if np.sum(move_visits) == 0: # 如果没有访问任何子节点，返回均匀分布
             valid_moves = game_state.get_valid_moves()
-            probs = np.zeros(COLS)
+            probs = np.zeros(num_cols)
             if valid_moves:
                 probs[valid_moves] = 1.0 / len(valid_moves)
             return probs
