@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import torch
-from config import MCTS_CPUCT, COLS
+from config import MCTS_CPUCT
 
 class Node:
     def __init__(self, parent=None, prior_p=1.0):
