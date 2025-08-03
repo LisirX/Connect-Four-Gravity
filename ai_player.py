@@ -14,7 +14,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # --- 全局加载模型以提高效率 ---
 AI_MODEL = ConnectFourNet().to(DEVICE)
 if os.path.exists(MODEL_SAVE_PATH):
-    AI_MODEL.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE))
+    AI_MODEL.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE, weights_only=True))
     print(f"AI Player: Loaded universal model from {MODEL_SAVE_PATH}")
 else:
     print("AI Player: WARNING - No trained model found. AI will perform poorly.")

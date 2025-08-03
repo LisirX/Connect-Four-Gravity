@@ -20,7 +20,7 @@ def self_play():
     # 模型现在是通用的
     model = ConnectFourNet().to(device)
     if os.path.exists(MODEL_SAVE_PATH):
-        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device))
+        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device, weights_only=True))
         print("Loaded existing universal model.")
     else:
         print("No existing model found, starting with a random one.")

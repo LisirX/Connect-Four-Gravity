@@ -16,7 +16,7 @@ def train():
 
     model = ConnectFourNet().to(device)
     if os.path.exists(MODEL_SAVE_PATH):
-        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device))
+        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device, weights_only=True))
         print("Loaded universal model for further training.")
     else:
         print("Initializing a new universal model.")
