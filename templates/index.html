@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four AI</title>
+    <!-- [FIXED] Load CSS using url_for for robust pathing -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Load Socket.IO from CDN -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Connect Four AI</h1>
+
+        <div class="status-bar" id="status">Connecting...</div>
+        <div class="thinking-status" id="thinking-status"></div>
+
+        <div class="progress-container">
+            <progress id="ai-progress" value="0" max="100"></progress>
+        </div>
+
+        <div class="game-area">
+            <div id="q-values-container" class="q-values-container"></div>
+            <div id="board" class="board-container"></div>
+        </div>
+
+        <div class="controls">
+            <div class="settings-panel">
+                <label for="rows-input">Rows:</label>
+                <input type="number" id="rows-input" value="6" min="4" max="10">
+                <label for="cols-input">Cols:</label>
+                <input type="number" id="cols-input" value="7" min="4" max="12">
+                <button id="new-game-btn">New Game</button>
+            </div>
+            <div class="mode-panel">
+                <label><input type="checkbox" id="analysis-mode"> Analysis Mode</label>
+                <label><input type="checkbox" id="ai-red-mode"> AI plays Red</label>
+                <label><input type="checkbox" id="ai-black-mode" checked> AI plays Black</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- [FIXED] Load JS using url_for at the end of the body -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

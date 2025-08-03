@@ -1,29 +1,66 @@
-# ai_player.py
 import torch
 import numpy as np
 import os
-import time
+import re # Import regular expressions
 import pickle
 import queue
 
 from mcts import MCTS
-from neural_network import UniversalConnectFourNet
 from heuristics import find_immediate_win_loss_search
-from config import MODEL_SAVE_PATH
+from neural_network import UniversalConnectFourNet
+# Import constants from config
+from config import MODEL_DIR, MODEL_BASENAME, CHALLENGER_MODEL_PATH
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def get_latest_champion_model_path():
+    """
+    Finds the model with the highest version number in the models directory.
+    Example: Finds 'universal_model_v5.pth' over 'universal_model_v4.pth'.
+    """
+    if not os.path.exists(MODEL_DIR):
+        return None
+
+    model_pattern = re.compile(f"^{MODEL_BASENAME}_v(\\d+)\\.pth$")
+    latest_version = -1
+    latest_model_path = None
+
+    for filename in os.listdir(MODEL_DIR):
+        match = model_pattern.match(filename)
+        if match:
+            version = int(match.group(1))
+            if version > latest_version:
+                latest_version = version
+                latest_model_path = os.path.join(MODEL_DIR, filename)
+
+    if latest_model_path:
+        print(f"AI Player: Found latest champion model: {os.path.basename(latest_model_path)}")
+        return latest_model_path
+    
+    # Fallback if no versioned champion is found
+    if os.path.exists(CHALLENGER_MODEL_PATH):
+        print(f"AI Player: No champion model found. Falling back to default: {CHALLENGER_MODEL_PATH}")
+        return CHALLENGER_MODEL_PATH
+        
+    return None
+
+# --- Main Model Loading Logic ---
 AI_MODEL = UniversalConnectFourNet().to(DEVICE)
-if os.path.exists(MODEL_SAVE_PATH):
+BEST_MODEL_PATH = get_latest_champion_model_path()
+
+if BEST_MODEL_PATH and os.path.exists(BEST_MODEL_PATH):
     try:
-        AI_MODEL.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE, weights_only=True))
-        print(f"AI Player: Loaded universal model from {MODEL_SAVE_PATH}")
+        AI_MODEL.load_state_dict(torch.load(BEST_MODEL_PATH, map_location=DEVICE, weights_only=True))
+        print(f"AI Player: Successfully loaded model from '{BEST_MODEL_PATH}'")
     except Exception as e:
-        print(f"AI Player: WARNING - Could not load model. Error: {e}. AI will perform poorly.")
+        print(f"AI Player: WARNING - Could not load model from '{BEST_MODEL_PATH}'. Error: {e}. AI will perform poorly.")
 else:
-    print("AI Player: WARNING - No trained model found. AI will perform poorly.")
+    print("AI Player: WARNING - No trained model found anywhere. AI will perform poorly.")
+
 AI_MODEL.eval()
 
+# The rest of the file (ai_move, _get_nn_q_values, etc.) remains unchanged.
+# ... (paste the rest of your original ai_player.py code here)
 def _get_nn_q_values(game):
     q_values = np.full(game.cols, -2.0)
     valid_moves = game.get_valid_moves()

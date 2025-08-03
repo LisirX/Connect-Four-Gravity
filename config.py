@@ -1,44 +1,94 @@
-# config.py
+import os
 
-# --- 默认游戏配置 ---
-DEFAULT_ROWS = 6
-DEFAULT_COLS = 7
+# ==============================================================================
+#  [核心] 智能训练循环配置 (smart_train.py)
+# ==============================================================================
+# Python 解释器的命令 (如果 'python' 不在系统PATH中，请使用完整路径)
+# 例如: "C:/Users/YourUser/AppData/Local/Programs/Python/Python39/python.exe"
+PYTHON_EXE = "python"
 
-# --- MCTS 配置 ---
-# NEW: 区分训练和对战的思考深度
-# 用于自我对弈（self_play.py），追求速度和数据量
-MCTS_SIMULATIONS_TRAIN = 100       
-# 用于与人类对战或分析（main_gui.py），追求棋力强度
-MCTS_SIMULATIONS_PLAY = 8000
-# [NEW] 专门用于分析模式，追求极致的计算深度和准确性
-MCTS_SIMULATIONS_ANALYSIS = 800000
-MCTS_CPUCT = 1.0
+# 存放所有模型文件的基础目录
+MODEL_DIR = "models"
+# 存放被击败的旧冠军模型的存档目录
+ARCHIVE_DIR = os.path.join(MODEL_DIR, "archive")
+# 模型的基础名称，版本号会附加在此名称后 (例如: universal_model_v1.pth)
+MODEL_BASENAME = "universal_model"
+# 用于记录当前最新冠军版本号的文本文件
+VERSION_FILE = "_version.txt"
 
-# --- 自对弈 (Self-Play) 配置 ---
-SELF_PLAY_GAMES = 200
-DATA_MAX_SIZE = 50000
-MODEL_SAVE_PATH = "models/universal_model.pth" 
+# 竞技场评估阈值 (整数, 0-100)
+# 新模型的净胜率 (胜 / (胜+负)) 必须大于或等于此值，才会被接受为新冠军。
+# 55 代表需要达到 55% 的净胜率。
+ARENA_WIN_RATE_THRESHOLD = 55
+
+
+# ==============================================================================
+#  模型与数据路径配置
+# ==============================================================================
+# 训练脚本 (train.py) 生成的 "挑战者" 模型的固定输出路径。
+# smart_train.py 会在挑战成功后重命名此文件。
+MODEL_SAVE_PATH = os.path.join(MODEL_DIR, "universal_model.pth")
+# 为了在代码中更清晰地表达意图，给挑战者模型路径起一个别名。
+CHALLENGER_MODEL_PATH = MODEL_SAVE_PATH
+
+# 自对弈生成的数据的保存路径。
 TRAINING_DATA_PATH = "data/training_data.pkl"
 
-# --- 训练 (Training) 配置 ---
+
+# ==============================================================================
+#  自对弈 (Self-Play) 配置
+# ==============================================================================
+# 每一轮训练循环中，要进行的自对弈游戏局数。
+SELF_PLAY_GAMES = 20
+# 训练数据集的最大容量 (FIFO, 先进先出)。
+DATA_MAX_SIZE = 50000
+# 温度参数阈值。在自对弈中，当棋局步数小于此值时，使用较高的温度(temp=1.0)以增加探索性；
+# 超过此步数后，使用极低的温度(temp=1e-3)以选择最优棋步。
+TEMPERATURE_THRESHOLD = 15
+
+
+# ==============================================================================
+#  训练 (Training) 配置
+# ==============================================================================
+# 每次调用 train.py 时的训练轮数 (Epochs)。
 EPOCHS = 10
-BATCH_SIZE = 64 
+# 训练时每个批次的大小。
+BATCH_SIZE = 64
+# 学习率。
 LEARNING_RATE = 0.001
 
-# --- 竞技场 (Arena) 配置 ---
-# 用于模型评估，让新旧模型对战
-ARENA_GAMES = 20 # 总共对战的局数 (建议为偶数)
-# 评估时使用的MCTS模拟次数，越高棋力越强，速度越慢
-ARENA_MCTS_SIMULATIONS = 1000
-# 对战结果保存路径
-RESULTS_FILE_PATH = "results/arena_results.json" 
 
-# 用于实时分析模式下，每次UI更新循环的MCTS模拟次数
-# 这个值不需要太高，因为它会持续不断地运行
+# ==============================================================================
+#  竞技场 (Arena) 配置
+# ==============================================================================
+# 新旧模型评估时对战的总局数 (为确保公平，强烈建议为偶数)。
+ARENA_GAMES = 2
+# 在竞技场评估时，每个模型单步棋的MCTS模拟次数。
+# 这个值越高，评估越准确，但速度越慢。
+ARENA_MCTS_SIMULATIONS = 1000
+# 竞技场对战结果 (JSON格式) 的保存目录。
+# 注意: 文件名现在由 arena.py 动态生成 (例如: arena_v2_vs_v1.json)。
+RESULTS_FILE_PATH = "results/arena_results.json"
+
+
+# ==============================================================================
+#  MCTS, 玩家 (Player) 与启发式 (Heuristics) 配置
+# ==============================================================================
+# --- MCTS 模拟次数配置 (根据不同场景) ---
+# 用于自对弈 (self_play.py)，追求速度和数据量。
+MCTS_SIMULATIONS_TRAIN = 100
+# 用于与人类对战或GUI演示 (main_gui.py / ai_player.py)，追求较强的棋力。
+MCTS_SIMULATIONS_PLAY = 8000
+# 用于深入分析模式，追求极致的计算深度和准确性。
+MCTS_SIMULATIONS_ANALYSIS = 800000
+# 用于GUI中实时分析模式下，每次UI更新循环的MCTS模拟次数。
 MCTS_SIMULATIONS_LIVE_ANALYSIS = 30
 
-# --- [新增] 启发式求解器配置 ---
-# 启发式求解器向前看的最大步数 (深度)。
-# 警告: >7 步在游戏开局阶段可能会非常慢。推荐值为 4-6。
-# 这个值应该是奇数，以确保最后一步是由AI自己下的。
-HEURISTIC_MAX_DEPTH = 3
+# MCTS中的UCT探索常数 (c_puct)。
+MCTS_CPUCT = 1.0
+
+# ==============================================================================
+#  Web端配置
+# ==============================================================================
+DEFAULT_ROWS = 6
+DEFAULT_COLS = 7

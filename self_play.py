@@ -11,7 +11,7 @@ from game_logic import ConnectFourGame
 from neural_network import UniversalConnectFourNet as ConnectFourNet
 from mcts import MCTS
 from heuristics import find_immediate_win_loss_search
-from config import SELF_PLAY_GAMES, MODEL_SAVE_PATH, TRAINING_DATA_PATH, DATA_MAX_SIZE, MCTS_SIMULATIONS_TRAIN
+from config import SELF_PLAY_GAMES, MODEL_SAVE_PATH, TRAINING_DATA_PATH, DATA_MAX_SIZE, MCTS_SIMULATIONS_TRAIN, TEMPERATURE_THRESHOLD
 
 def augment_data(state, probs, value):
     original_data = {'state': state, 'probs': probs, 'value': value}
@@ -51,6 +51,7 @@ def self_play():
         rows, cols = random.randint(5, 8), random.randint(5, 8)
         game = ConnectFourGame(rows=rows, cols=cols)
         game_history = []
+        move_count = 0
         
         while not game.game_over:
             state = game.get_board_state()
@@ -71,7 +72,8 @@ def self_play():
             else:
                 # 运行MCTS来获得策略
                 # [FIXED] 确保get_move_analysis传递正确的参数
-                analysis = mcts_player.get_move_analysis(game)
+                temp = 1.0 if move_count < TEMPERATURE_THRESHOLD else 1e-3
+                analysis = mcts_player.get_move_analysis(game, temp=temp)
                 action_probs = analysis["policy"]
                 
                 valid_moves = game.get_valid_moves()

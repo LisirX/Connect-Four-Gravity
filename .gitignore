@@ -1,11 +1,29 @@
-# 1. 首先，忽略所有内容
-*
+# 忽略 Python 的缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
 
-# 2. 然后，豁免根目录下的 .py 和 .bat 文件
-# "!" 表示不要忽略后面的匹配项。
-# 因为没有路径斜杠，这个规则只对根目录生效。
-!*.py
-!*.bat
+# 忽略虚拟环境文件夹
+venv/
+env/
+.env
 
-# 确保 .gitignore 文件本身不被忽略
-!.gitignore
+# 忽略由 pip 生成的文件
+*.egg-info/
+dist/
+build/
+
+# 忽略特定的配置文件（如果它们包含敏感信息）
+# config.ini
+
+# 忽略IDE/编辑器相关的文件夹
+.vscode/
+.idea/
+
+# 忽略由项目生成的数据或结果 (根据你的项目)
+/data/training_data.pkl
+/results/arena_results.json
+
+# 忽略操作系统生成的文件
+.DS_Store
+Thumbs.db
