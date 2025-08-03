@@ -2,16 +2,18 @@
 import numpy as np
 import math
 import torch
-import pickle # <-- 已添加
+import pickle
 
-from config import MCTS_CPUCT, MCTS_SIMULATIONS
+# CHANGED: 导入 MCTS_CPUCT，但不再需要默认的 SIMULATIONS
+from config import MCTS_CPUCT
 
 class Node:
+    # ... (Node 类的代码保持不变) ...
     def __init__(self, parent=None, prior_p=1.0):
         self.parent = parent
-        self.children = {}  # action -> Node
+        self.children = {}
         self.n_visits = 0
-        self.q_value = 0 # -1 到 1 的值，代表当前玩家的期望回报
+        self.q_value = 0
         self.u_value = 0
         self.p_value = prior_p
 
@@ -28,44 +30,37 @@ class Node:
         self.q_value += (leaf_value - self.q_value) / self.n_visits
 
     def get_value(self):
-        # 如果父节点访问次数为0，则u_value也应为0，避免除零错误
         if self.parent.n_visits == 0:
             parent_visits_sqrt = 0
         else:
             parent_visits_sqrt = math.sqrt(self.parent.n_visits)
-            
         self.u_value = MCTS_CPUCT * self.p_value * parent_visits_sqrt / (1 + self.n_visits)
         return self.q_value + self.u_value
 
 class MCTS:
-    def __init__(self, game, model, device):
+    # CHANGED: 构造函数接受模拟次数作为参数
+    def __init__(self, game, model, device, simulations):
         self.game = game
         self.model = model
         self.device = device
-        self.root = Node() # 初始化时创建根节点
+        self.simulations = simulations # NEW: 存储模拟次数
+        self.root = Node()
 
     def get_move_analysis(self, game_state, num_cols, temp=1e-3):
-        """
-        运行MCTS模拟并返回每一步的详细分析（策略概率和Q值）。
-        """
-        # 每次调用分析时，都基于当前游戏状态重置根节点
         self.root = Node()
-        
-        for _ in range(MCTS_SIMULATIONS):
-            # 创建一个游戏副本进行模拟，避免修改原始游戏状态
+        # CHANGED: 使用实例变量 self.simulations
+        for _ in range(self.simulations):
             sim_game = pickle.loads(pickle.dumps(game_state))
             self.search(sim_game)
 
-        # 从根节点的子节点中提取访问次数和 Q 值
         move_visits = np.zeros(num_cols)
-        q_values = np.zeros(num_cols) # -1 到 1 的值
-        
+        q_values = np.zeros(num_cols)
         for action, node in self.root.children.items():
             if action < num_cols:
                 move_visits[action] = node.n_visits
                 q_values[action] = node.q_value
-
-        # --- 计算策略概率 ---
+        
+        # ... (get_move_analysis 的其余部分代码保持不变) ...
         if np.sum(move_visits) == 0:
             valid_moves = game_state.get_valid_moves()
             probs = np.zeros(num_cols)
@@ -73,27 +68,33 @@ class MCTS:
                 probs[valid_moves] = 1.0 / len(valid_moves)
             policy_probs = probs
         else:
-            move_probs = move_visits**(1/temp)
-            policy_probs = move_probs / np.sum(move_probs)
+            if temp < 1e-2:
+                policy_probs = np.zeros_like(move_visits)
+                max_visits = np.max(move_visits)
+                best_actions = np.where(move_visits == max_visits)[0]
+                best_action = np.random.choice(best_actions)
+                policy_probs[best_action] = 1.0
+            else:
+                move_probs = move_visits**(1/temp)
+                policy_probs = move_probs / np.sum(move_probs)
 
-        # 返回一个包含所有分析数据的字典
-        return {
-            "policy": policy_probs,
-            "q_values": q_values
-        }
-
-    def search(self, game_state):
-        """
-        执行一次从根节点到叶节点的MCTS搜索。
-        """
-        node = self.root
+        if np.isnan(np.sum(policy_probs)):
+            print("Warning: NaN detected in policy probabilities. Falling back to uniform distribution.")
+            valid_moves = game_state.get_valid_moves()
+            policy_probs = np.zeros(num_cols)
+            if valid_moves:
+                policy_probs[valid_moves] = 1.0 / len(valid_moves)
         
-        # --- SELECTION ---
+        return {"policy": policy_probs, "q_values": q_values}
+
+
+    # ... (search 方法的代码保持不变) ...
+    def search(self, game_state):
+        node = self.root
         while node.children:
             action, node = node.select_child()
             game_state.make_move(action)
 
-        # --- EXPANSION & EVALUATION ---
         if not game_state.game_over:
             board_state_tensor = torch.FloatTensor(game_state.get_board_state()).unsqueeze(0).to(self.device)
             with torch.no_grad():
@@ -110,17 +111,12 @@ class MCTS:
                      masked_policy[valid_moves] = 1.0 / len(valid_moves)
 
             node.expand(masked_policy)
-            leaf_value = -value.item() # 从下一个玩家的角度看，价值是负的
+            leaf_value = -value.item()
         else:
-            if game_state.winner == -1: # Draw
-                leaf_value = 0.0
-            else: # Win/Loss
-                # 如果游戏结束，那么对于上一个玩家来说是胜利
-                leaf_value = 1.0 
+            if game_state.winner == -1: leaf_value = 0.0
+            else: leaf_value = 1.0 
 
-        # --- BACKPROPAGATION ---
         while node is not None:
-            # 价值是相对于当前节点的父节点的玩家而言的
             node.update(leaf_value)
-            leaf_value = -leaf_value # 每次向上传播时，视角反转
+            leaf_value = -leaf_value
             node = node.parent
