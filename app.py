@@ -207,9 +207,13 @@ def handle_toggle_mode(data):
             # 开启分析模式时关闭所有AI模式
             modes['ai_red'] = False
             modes['ai_black'] = False
+            # 立即停止所有AI任务
+            stop_thinking_task(sid)  # 新增：停止思考任务
         elif mode in ('ai_red', 'ai_black') and is_active:
             # 开启AI模式时关闭分析模式
             modes['analysis'] = False
+            # 停止分析线程
+            stop_analysis_thread(sid)
         
         # 更新当前模式状态
         modes[mode] = is_active
@@ -225,6 +229,14 @@ def handle_toggle_mode(data):
             stop_analysis_thread(sid)
     else:
         check_and_trigger_ai(sid)
+
+def stop_thinking_task(sid):
+    """停止当前正在进行的AI思考任务"""
+    if not (client_data := sessions.get(sid)): return
+    if client_data.get('is_thinking_flag'):
+        client_data['is_thinking_flag'][0] = False
+        print(f"Session {sid}: Stopped AI thinking task.")
+    client_data['is_thinking_flag'] = None
 
 @socketio.on('get_game_state')
 def handle_get_game_state():
