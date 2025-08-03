@@ -45,7 +45,7 @@ def train():
             pred_policy, pred_value = model(state)
             
             policy_loss = -torch.sum(target_policy * pred_policy)
-            value_loss = F.mse_loss(pred_value.squeeze(), target_value)
+            value_loss = F.mse_loss(pred_value.squeeze(), target_value.squeeze())
             loss = policy_loss + value_loss
 
             optimizer.zero_grad()
