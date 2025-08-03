@@ -7,15 +7,12 @@ import pickle
 from tqdm import tqdm
 import numpy as np
 
-# CHANGED: 导入 Dataset 和 DataLoader
 from torch.utils.data import Dataset, DataLoader
 
 from neural_network import UniversalConnectFourNet as ConnectFourNet
-# CHANGED: 导入 BATCH_SIZE
 from config import MODEL_SAVE_PATH, TRAINING_DATA_PATH, EPOCHS, LEARNING_RATE, BATCH_SIZE
 
-# --- NEW: 自定义 Dataset 类 ---
-# 这是一个好的实践，将数据逻辑与训练逻辑解耦
+# --- 自定义 Dataset 类 (不变) ---
 class ConnectFourDataset(Dataset):
     def __init__(self, data):
         self.data = data
@@ -26,29 +23,24 @@ class ConnectFourDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
-# --- NEW: 自定义 Collate Function ---
-# 这是实现批处理的核心！它负责将不同尺寸的样本填充并打包。
+# --- [核心修改] 自定义 Collate Function ---
 def custom_collate_fn(batch):
-    # batch 是一个列表，列表中的每个元素都是一个 data_point 字典
-    
     states = [item['state'] for item in batch]
     probs = [item['probs'] for item in batch]
     values = [item['value'] for item in batch]
 
-    # --- 填充 State ---
+    # --- 填充 State (逻辑不变) ---
     max_rows = max(s.shape[1] for s in states)
     max_cols = max(s.shape[2] for s in states)
     
     padded_states = []
     for s in states:
         _, rows, cols = s.shape
-        # 创建一个填满0的大棋盘
         padded_s = np.zeros((3, max_rows, max_cols), dtype=np.float32)
-        # 将小棋盘的数据复制进去
         padded_s[:, :rows, :cols] = s
         padded_states.append(padded_s)
 
-    # --- 填充 Policy (Probs) ---
+    # --- 填充 Policy (逻辑不变) ---
     max_policy_len = max(len(p) for p in probs)
     padded_probs = []
     for p in probs:
@@ -56,10 +48,31 @@ def custom_collate_fn(batch):
         padded_p[:len(p)] = p
         padded_probs.append(padded_p)
 
+    # --- [新增] 计算和填充 target_rows ---
+    target_rows_list = []
+    for s in states:
+        # s 的形状是 (3, rows, cols)
+        # 通过 state[0] (玩家1棋子) 和 state[1] (玩家2棋子) 重建棋盘占用情况
+        board_occupied = (s[0] + s[1])
+        rows, cols = board_occupied.shape
+        # 对每一列求和，得到该列已有的棋子数
+        pieces_in_col = np.sum(board_occupied, axis=0)
+        # 下一个可用行的索引 = 总行数 - 棋子数 - 1
+        open_rows = (rows - pieces_in_col - 1).astype(np.int64)
+        target_rows_list.append(open_rows)
+
+    padded_target_rows = []
+    for r in target_rows_list:
+        # 使用-1作为填充值，因为行索引不可能是负数
+        padded_r = np.full(max_policy_len, -1, dtype=np.int64)
+        padded_r[:len(r)] = r
+        padded_target_rows.append(padded_r)
+        
     return {
         'state': torch.tensor(np.array(padded_states)),
         'probs': torch.tensor(np.array(padded_probs)),
-        'value': torch.tensor(values, dtype=torch.float32)
+        'value': torch.tensor(values, dtype=torch.float32),
+        'target_rows': torch.tensor(np.array(padded_target_rows)) # 新增返回项
     }
 
 
@@ -81,12 +94,9 @@ def train():
         return
         
     with open(TRAINING_DATA_PATH, 'rb') as f:
-        # pickle加载的数据是deque，我们将其转为list
         training_data = list(pickle.load(f))
 
-    # --- CHANGED: 使用 Dataset 和 DataLoader ---
     dataset = ConnectFourDataset(training_data)
-    # DataLoader会使用我们的自定义函数来打包数据
     data_loader = DataLoader(
         dataset, 
         batch_size=BATCH_SIZE, 
@@ -97,27 +107,29 @@ def train():
     model.train()
     for epoch in range(EPOCHS):
         total_loss = 0
-        
-        # --- CHANGED: 循环现在遍历 DataLoader ---
-        # pbar 现在包裹 data_loader
         pbar = tqdm(data_loader, desc=f"Epoch {epoch+1}/{EPOCHS}")
         
         for batch in pbar:
-            # 从字典中获取已经打包好的批次数据，并送到GPU
             states = batch['state'].to(device)
             target_policies = batch['probs'].to(device)
             target_values = batch['value'].to(device)
+            # [核心修改] 从批次中获取 target_rows
+            target_rows = batch['target_rows'].to(device)
 
-            pred_policies, pred_values = model(states)
+            # [核心修改] 将 target_rows 传入模型
+            pred_policies, pred_values = model(states, target_rows)
             
-            # --- 损失计算 ---
-            # 策略损失：只计算有效部分，忽略填充部分
-            # 我们需要确保预测和目标的长度一致
+            # --- 损失计算 (逻辑不变) ---
             target_len = target_policies.size(1)
             pred_policies = pred_policies[:, :target_len]
             
-            policy_loss = -torch.sum(target_policies * pred_policies) / states.size(0) # 除以批大小
-            value_loss = F.mse_loss(pred_values.squeeze(), target_values)
+            # 忽略在填充策略上的损失
+            valid_policy_mask = target_policies > 0
+            policy_loss = -torch.sum(target_policies[valid_policy_mask] * pred_policies[valid_policy_mask])
+            if valid_policy_mask.sum() > 0:
+                policy_loss /= valid_policy_mask.sum()
+            
+            value_loss = F.mse_loss(pred_values.squeeze(-1), target_values)
             loss = policy_loss + value_loss
 
             optimizer.zero_grad()
@@ -125,7 +137,6 @@ def train():
             optimizer.step()
             
             total_loss += loss.item()
-            # 计算平均损失
             avg_loss = total_loss / (pbar.n + 1)
             pbar.set_postfix({"Loss": loss.item(), "Avg Loss": f"{avg_loss:.4f}"})
 

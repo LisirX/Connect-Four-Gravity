@@ -4,11 +4,9 @@ import math
 import torch
 import pickle
 
-# CHANGED: 导入 MCTS_CPUCT，但不再需要默认的 SIMULATIONS
 from config import MCTS_CPUCT
 
 class Node:
-    # ... (Node 类的代码保持不变) ...
     def __init__(self, parent=None, prior_p=1.0):
         self.parent = parent
         self.children = {}
@@ -30,25 +28,20 @@ class Node:
         self.q_value += (leaf_value - self.q_value) / self.n_visits
 
     def get_value(self):
-        if self.parent.n_visits == 0:
-            parent_visits_sqrt = 0
-        else:
-            parent_visits_sqrt = math.sqrt(self.parent.n_visits)
+        parent_visits_sqrt = math.sqrt(self.parent.n_visits) if self.parent else 1
         self.u_value = MCTS_CPUCT * self.p_value * parent_visits_sqrt / (1 + self.n_visits)
         return self.q_value + self.u_value
 
 class MCTS:
-    # CHANGED: 构造函数接受模拟次数作为参数
     def __init__(self, game, model, device, simulations):
         self.game = game
         self.model = model
         self.device = device
-        self.simulations = simulations # NEW: 存储模拟次数
+        self.simulations = simulations
         self.root = Node()
 
     def get_move_analysis(self, game_state, num_cols, temp=1e-3):
         self.root = Node()
-        # CHANGED: 使用实例变量 self.simulations
         for _ in range(self.simulations):
             sim_game = pickle.loads(pickle.dumps(game_state))
             self.search(sim_game)
@@ -60,7 +53,6 @@ class MCTS:
                 move_visits[action] = node.n_visits
                 q_values[action] = node.q_value
         
-        # ... (get_move_analysis 的其余部分代码保持不变) ...
         if np.sum(move_visits) == 0:
             valid_moves = game_state.get_valid_moves()
             probs = np.zeros(num_cols)
@@ -70,8 +62,7 @@ class MCTS:
         else:
             if temp < 1e-2:
                 policy_probs = np.zeros_like(move_visits)
-                max_visits = np.max(move_visits)
-                best_actions = np.where(move_visits == max_visits)[0]
+                best_actions = np.where(move_visits == np.max(move_visits))[0]
                 best_action = np.random.choice(best_actions)
                 policy_probs[best_action] = 1.0
             else:
@@ -87,8 +78,6 @@ class MCTS:
         
         return {"policy": policy_probs, "q_values": q_values}
 
-
-    # ... (search 方法的代码保持不变) ...
     def search(self, game_state):
         node = self.root
         while node.children:
@@ -97,8 +86,19 @@ class MCTS:
 
         if not game_state.game_over:
             board_state_tensor = torch.FloatTensor(game_state.get_board_state()).unsqueeze(0).to(self.device)
+            
+            # --- [核心修改] 在调用模型前，计算 target_rows ---
+            # 这是针对单个游戏状态的计算，而非批处理
+            board = game_state.board
+            rows, cols = board.shape
+            pieces_in_col = np.sum(board != 0, axis=0)
+            open_rows = (rows - pieces_in_col - 1).astype(np.int64)
+            # 转换为张量，并增加一个批次维度
+            target_rows_tensor = torch.from_numpy(open_rows).unsqueeze(0).to(self.device)
+
             with torch.no_grad():
-                log_policy, value = self.model(board_state_tensor)
+                # [核心修改] 将 target_rows_tensor 传入模型
+                log_policy, value = self.model(board_state_tensor, target_rows_tensor)
             
             policy = torch.exp(log_policy).squeeze(0).cpu().numpy()
             valid_moves = game_state.get_valid_moves()
