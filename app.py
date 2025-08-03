@@ -1,3 +1,4 @@
+# app.py
 import os
 import sys
 import queue
@@ -9,7 +10,8 @@ from flask_socketio import SocketIO
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from game_logic import ConnectFourGame
-from ai_player import ai_move, AI_MODEL
+# [FIX] Import the DEVICE constant along with the model and ai_move function
+from ai_player import ai_move, AI_MODEL, DEVICE
 from mcts import MCTS
 from config import (
     DEFAULT_ROWS, DEFAULT_COLS, MCTS_SIMULATIONS_PLAY,
@@ -17,8 +19,6 @@ from config import (
 )
 
 # --- Flask & SocketIO App Initialization ---
-# [FIXED] Use standard Flask conventions. It will automatically find the 'templates'
-# folder and the 'static' folder.
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_super_secret_key_change_me'
 socketio = SocketIO(app, async_mode='threading')
@@ -55,7 +55,6 @@ def emit_modes_update(sid):
     if (client_data := sessions.get(sid)):
         socketio.emit('modes_update', client_data['modes'], room=sid)
 
-# [FIX] New helper to cleanly stop only the analysis thread
 def stop_analysis_thread(sid):
     if (client_data := sessions.get(sid)) and (thread := client_data.get('analysis_thread')):
         client_data['is_analysis_active'][0] = False
@@ -63,7 +62,6 @@ def stop_analysis_thread(sid):
         client_data['analysis_thread'] = None
         print(f"Session {sid}: Stopped analysis thread.")
 
-# [FIX] New helper to robustly restart analysis
 def restart_analysis_if_active(sid):
     client_data = sessions.get(sid)
     if not client_data or not client_data['modes']['analysis'] or client_data['game'].game_over:
@@ -111,7 +109,6 @@ def trigger_ai_move(sid):
         client_data['is_thinking_flag'] = None
         socketio.emit('thinking_update', {'isThinking': False, 'status': ''}, room=sid)
         emit_game_update(sid)
-        # [FIX] Restart analysis after the AI has moved
         restart_analysis_if_active(sid)
         check_and_trigger_ai(sid)
 
@@ -150,7 +147,9 @@ def handle_connect():
     sessions[sid] = {
         'game': ConnectFourGame(rows=DEFAULT_ROWS, cols=DEFAULT_COLS),
         'modes': {'analysis': False, 'ai_red': False, 'ai_black': True},
-        'mcts_instance': MCTS(model=AI_MODEL, device="cpu", simulations=0),
+        # [FIXED] Use the imported DEVICE constant instead of hardcoding "cpu".
+        # This ensures the MCTS instance and the model are on the same device.
+        'mcts_instance': MCTS(model=AI_MODEL, device=DEVICE, simulations=0),
         'is_thinking_flag': None,
         'analysis_thread': None,
         'is_analysis_active': [False],
@@ -200,16 +199,30 @@ def handle_toggle_mode(data):
     sid = get_session_id()
     if not (client_data := sessions.get(sid)): return
     mode, is_active = data.get('mode'), data.get('isActive')
-    if mode in client_data['modes']:
-        client_data['modes'][mode] = is_active
+    modes = client_data['modes']
+    
+    if mode in modes:
+        # 互斥逻辑：分析模式和人机模式不能同时开启
+        if mode == 'analysis' and is_active:
+            # 开启分析模式时关闭所有AI模式
+            modes['ai_red'] = False
+            modes['ai_black'] = False
+        elif mode in ('ai_red', 'ai_black') and is_active:
+            # 开启AI模式时关闭分析模式
+            modes['analysis'] = False
+        
+        # 更新当前模式状态
+        modes[mode] = is_active
         print(f"Session {sid}: Toggled mode '{mode}' to {is_active}")
 
     emit_modes_update(sid)
     emit_game_update(sid)
 
     if mode == 'analysis':
-        if is_active: restart_analysis_if_active(sid)
-        else: stop_analysis_thread(sid)
+        if is_active: 
+            restart_analysis_if_active(sid)
+        else: 
+            stop_analysis_thread(sid)
     else:
         check_and_trigger_ai(sid)
 

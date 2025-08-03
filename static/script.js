@@ -126,6 +126,22 @@ document.addEventListener('DOMContentLoaded', () => {
         checkbox.addEventListener('change', (event) => {
             const modeId = event.target.id;
             const modeKey = modeId.replace('-mode', '').replace('ai-','ai_');
+            
+            // 互斥逻辑：分析模式和人机模式不能同时开启
+            if (modeKey === 'analysis' && event.target.checked) {
+                // 开启分析模式时关闭所有AI模式
+                aiRedModeCheck.checked = false;
+                aiBlackModeCheck.checked = false;
+                // 发送所有模式更新
+                socket.emit('toggle_mode', { mode: 'ai_red', isActive: false });
+                socket.emit('toggle_mode', { mode: 'ai_black', isActive: false });
+            } 
+            else if ((modeKey === 'ai_red' || modeKey === 'ai_black') && event.target.checked) {
+                // 开启AI模式时关闭分析模式
+                analysisModeCheck.checked = false;
+                socket.emit('toggle_mode', { mode: 'analysis', isActive: false });
+            }
+            
             console.log(`UI: Toggled mode ${modeKey} to ${event.target.checked}`);
             socket.emit('toggle_mode', {
                 mode: modeKey,
