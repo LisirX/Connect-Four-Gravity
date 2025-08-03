@@ -36,3 +36,9 @@ RESULTS_FILE_PATH = "results/arena_results.json"
 # 用于实时分析模式下，每次UI更新循环的MCTS模拟次数
 # 这个值不需要太高，因为它会持续不断地运行
 MCTS_SIMULATIONS_LIVE_ANALYSIS = 30
+
+# --- [新增] 启发式求解器配置 ---
+# 启发式求解器向前看的最大步数 (深度)。
+# 警告: >7 步在游戏开局阶段可能会非常慢。推荐值为 4-6。
+# 这个值应该是奇数，以确保最后一步是由AI自己下的。
+HEURISTIC_MAX_DEPTH = 3
