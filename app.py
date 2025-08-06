@@ -3,7 +3,7 @@ import os
 import sys
 import queue
 import threading
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect
 from flask_socketio import SocketIO
 
 # Add the project root to the Python path
@@ -20,7 +20,7 @@ from config import (
 
 # --- Flask & SocketIO App Initialization ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_super_secret_key_change_me'
+app.config['SECRET_KEY'] = '3+02.5k38l@af/*Shu23'
 socketio = SocketIO(app, async_mode='threading')
 
 sessions = {}
@@ -250,5 +250,12 @@ def index():
 
 if __name__ == '__main__':
     print("Starting Connect Four server...")
-    print("Open http://127.0.0.1:5000 in your browser.")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+    print("Open http://127.0.0.1:16927 in your browser.")
+    socketio.run(
+        app, 
+        debug=False, 
+        host='0.0.0.0', 
+        ssl_context=('cert.pem', 'key.pem'), 
+        port=16927, 
+        allow_unsafe_werkzeug=True
+    )  # Use SSL context for HTTPS
