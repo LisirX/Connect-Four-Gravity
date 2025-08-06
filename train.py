@@ -4,7 +4,6 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import pickle
-from tqdm import tqdm
 import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
@@ -102,12 +101,14 @@ def train():
         collate_fn=custom_collate_fn
     )
 
+    # --- 修改后 ---
     model.train()
+    total_batches = len(data_loader)
     for epoch in range(EPOCHS):
         total_loss = 0
-        pbar = tqdm(data_loader, desc=f"Epoch {epoch+1}/{EPOCHS}")
+        print(f"\n--- Epoch {epoch+1}/{EPOCHS} ---")
         
-        for batch in pbar:
+        for i, batch in enumerate(data_loader):
             states = batch['state'].to(device)
             target_policies = batch['probs'].to(device)
             target_values = batch['value'].to(device)
@@ -118,11 +119,9 @@ def train():
             target_len = target_policies.size(1)
             pred_policies = pred_policies[:, :target_len]
             
-            # 使用掩码来确保只在有效（非填充）的策略上下计算损失
             valid_policy_mask = target_policies > 0
             policy_loss = -torch.sum(target_policies[valid_policy_mask] * pred_policies[valid_policy_mask])
             
-            # 正则化，除以有效条目的数量，以获得更稳定的平均损失
             num_valid_entries = valid_policy_mask.sum()
             if num_valid_entries > 0:
                 policy_loss /= num_valid_entries
@@ -133,10 +132,12 @@ def train():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             total_loss += loss.item()
-            avg_loss = total_loss / (pbar.n + 1)
-            pbar.set_postfix({"Loss": f"{loss.item():.4f}", "Avg Loss": f"{avg_loss:.4f}"})
+
+        # 在每个 epoch 结束时打印最终的平均损失
+        final_avg_loss = total_loss / total_batches
+        print(f"Epoch {epoch+1} 完成, 平均损失: {final_avg_loss:.4f}")
 
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     print(f"Training complete. Universal model saved to {MODEL_SAVE_PATH}")

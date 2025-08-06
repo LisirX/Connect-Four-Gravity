@@ -7,7 +7,6 @@ import argparse
 import json
 import random
 import re # [新增] 导入正则表达式库，用于提取版本号
-from tqdm import tqdm
 
 from game_logic import ConnectFourGame
 from neural_network import UniversalConnectFourNet as ConnectFourNet
@@ -113,13 +112,11 @@ def main(old_model_path):
     scores = {"new_model_wins": 0, "old_model_wins": 0, "draws": 0}
     all_game_logs = []
 
-    pbar = tqdm(range(ARENA_GAMES), desc=f"竞技场: {new_player.name} vs {old_player.name}")
-
-    for i in pbar:
+    print(f"竞技场: {new_player.name} vs {old_player.name}, 共 {ARENA_GAMES} 局")
+    for i in range(ARENA_GAMES):
         # 轮流执先
         p1, p2 = (new_player, old_player) if i % 2 == 0 else (old_player, new_player)
         is_new_player_p1 = (p1 == new_player)
-        pbar.set_postfix({"先手": p1.name})
         
         game_log = play_game(p1, p2)
         winner_num = game_log["winner_player_number"]
