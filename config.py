@@ -39,9 +39,9 @@ TRAINING_DATA_PATH = "data/training_data.pkl"
 #  自对弈 (Self-Play) 配置
 # ==============================================================================
 # 每一轮训练循环中，要进行的自对弈游戏局数。
-SELF_PLAY_GAMES = 200
+SELF_PLAY_GAMES = 800
 # 训练数据集的最大容量 (FIFO, 先进先出)。
-DATA_MAX_SIZE = 50000
+DATA_MAX_SIZE = 80000
 # 温度参数阈值。在自对弈中，当棋局步数小于此值时，使用较高的温度(temp=1.0)以增加探索性；
 # 超过此步数后，使用极低的温度(temp=1e-3)以选择最优棋步。
 TEMPERATURE_THRESHOLD = 15
@@ -76,7 +76,7 @@ RESULTS_FILE_PATH = "results/arena_results.json"
 # ==============================================================================
 # --- MCTS 模拟次数配置 (根据不同场景) ---
 # 用于自对弈 (self_play.py)，追求速度和数据量。
-MCTS_SIMULATIONS_TRAIN = 100
+MCTS_SIMULATIONS_TRAIN = 1600
 # 用于与人类对战或GUI演示 (main_gui.py / ai_player.py)，追求较强的棋力。
 MCTS_SIMULATIONS_PLAY = 8000
 # 用于深入分析模式，追求极致的计算深度和准确性。
