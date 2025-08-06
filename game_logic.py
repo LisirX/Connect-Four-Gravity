@@ -2,7 +2,6 @@
 import numpy as np
 
 class ConnectFourGame:
-    # CHANGED: 接受行列数作为参数
     def __init__(self, rows=6, cols=7):
         self.rows = rows
         self.cols = cols
@@ -15,7 +14,6 @@ class ConnectFourGame:
         return [c for c in range(self.cols) if self.board[0][c] == 0]
 
     def make_move(self, col):
-        # ... (内部逻辑不变, 因为它已经使用了 self.rows 和 self.cols)
         if col not in self.get_valid_moves():
             return False
 
@@ -42,7 +40,6 @@ class ConnectFourGame:
         self.current_player = 3 - self.current_player
 
     def check_win(self, last_move):
-        # ... (内部逻辑不变)
         if not last_move: return False
         player = self.board[last_move[0]][last_move[1]]
         row, col = last_move

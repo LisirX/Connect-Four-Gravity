@@ -49,18 +49,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // [MODIFIED] This function now shows 0.0% for unanalyzed columns.
     const drawQValues = (qValues) => {
         const qCells = qValuesContainer.querySelectorAll('.q-value-cell');
         qCells.forEach((cell, index) => {
             const qValue = qValues[index];
+            let winRate;
+
+            // If the Q-value is valid (greater than -2.0), calculate the win rate.
             if (qValue !== undefined && qValue > -2.0) {
-                const winRate = ((qValue + 1) / 2) * 100;
-                cell.textContent = `${winRate.toFixed(1)}%`;
-                if (winRate > 60) cell.style.color = '#4caf50';
-                else if (winRate < 40) cell.style.color = '#f44336';
-                else cell.style.color = '#ffeb3b';
+                winRate = ((qValue + 1) / 2) * 100;
             } else {
-                cell.textContent = '';
+                // Otherwise, for unanalyzed or invalid columns, the win rate is considered 0.
+                winRate = 0;
+            }
+
+            // Set the text content uniformly.
+            cell.textContent = `${winRate.toFixed(1)}%`;
+
+            // Set the color uniformly based on the win rate.
+            if (winRate > 60) {
+                cell.style.color = '#4caf50'; // Green
+            } else if (winRate < 40) {
+                cell.style.color = '#f44336'; // Red (0% will fall into this category)
+            } else {
+                cell.style.color = '#ffeb3b'; // Yellow
             }
         });
     };
@@ -94,12 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isThinking) {
             progressBar.value = 0;
             // Redraw board to show valid moves for human
-            socket.emit('request_game_state'); // Simple way to ask for a redraw
+            socket.emit('get_game_state'); 
         }
     });
-    
-    // Add a handler for our new request
-    socket.on('request_game_state', () => socket.emit('get_game_state'));
 
     socket.on('progress_update', (data) => {
         progressBar.max = data.total_sims;
@@ -127,17 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const modeId = event.target.id;
             const modeKey = modeId.replace('-mode', '').replace('ai-','ai_');
             
-            // 互斥逻辑：分析模式和人机模式不能同时开启
             if (modeKey === 'analysis' && event.target.checked) {
-                // 开启分析模式时关闭所有AI模式
                 aiRedModeCheck.checked = false;
                 aiBlackModeCheck.checked = false;
-                // 发送所有模式更新
                 socket.emit('toggle_mode', { mode: 'ai_red', isActive: false });
                 socket.emit('toggle_mode', { mode: 'ai_black', isActive: false });
             } 
             else if ((modeKey === 'ai_red' || modeKey === 'ai_black') && event.target.checked) {
-                // 开启AI模式时关闭分析模式
                 analysisModeCheck.checked = false;
                 socket.emit('toggle_mode', { mode: 'analysis', isActive: false });
             }
