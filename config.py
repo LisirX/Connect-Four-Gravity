@@ -79,8 +79,6 @@ RESULTS_FILE_PATH = "results/arena_results.json"
 MCTS_SIMULATIONS_TRAIN = 1600
 # 用于与人类对战或GUI演示 (main_gui.py / ai_player.py)，追求较强的棋力。
 MCTS_SIMULATIONS_PLAY = 8000
-# 用于深入分析模式，追求极致的计算深度和准确性。
-MCTS_SIMULATIONS_ANALYSIS = 800000
 # 用于GUI中实时分析模式下，每次UI更新循环的MCTS模拟次数。
 MCTS_SIMULATIONS_LIVE_ANALYSIS = 30
 
